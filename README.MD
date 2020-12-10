@@ -5,7 +5,7 @@ Build and maintain SSM documents.
 ## Usage
 
 ```bash
-
+curl https://gobinaries.com/justmiles/ssm-document-generator | sh
 ssm-document-generator <path to template>
 ```
 
