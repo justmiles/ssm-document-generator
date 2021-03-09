@@ -55,17 +55,20 @@ type Document struct {
 	SchemaVersion string `yaml:"schemaVersion" json:"schemaVersion"`
 	Description   string `yaml:"description" json:"description"`
 	Parameters    struct {
-	} `yaml:"parameters" json:"parameters"`
+	} `yaml:"parameters,omitempty" json:"parameters,omitempty"`
 	MainSteps []struct {
 		Precondition struct {
-			StringEquals []string `yaml:"StringEquals" json:"StringEquals"`
-		} `yaml:"precondition" json:"precondition"`
+			StringEquals []string `yaml:"StringEquals,omitempty" json:"StringEquals,omitempty"`
+		} `yaml:"precondition,omitempty" json:"precondition,omitempty"`
 		Action string `yaml:"action" json:"action"`
 		Name   string `yaml:"name" json:"name"`
 		Inputs struct {
-			TimeoutSeconds   int      `yaml:"timeoutSeconds" json:"timeoutSeconds"`
-			RunCommand       []string `yaml:"runCommand" json:"runCommand"`
-			RunCommandScript string   `yaml:"runCommandScript,omitempty" json:"runCommandScript,omitempty"`
+			TimeoutSeconds     int      `yaml:"timeoutSeconds" json:"timeoutSeconds"`
+			RunCommand         []string `yaml:"runCommand,omitempty" json:"runCommand,omitempty"`
+			RunCommandScript   string   `yaml:"runCommandScript,omitempty" json:"runCommandScript,omitempty"`
+			DocumentType       string   `yaml:"documentType,omitempty" json:"documentType,omitempty"`
+			DocumentPath       string   `yaml:"documentPath,omitempty" json:"documentPath,omitempty"`
+			DocumentParameters string   `yaml:"documentParameters,omitempty" json:"documentParameters,omitempty"`
 		} `yaml:"inputs" json:"inputs"`
 	} `yaml:"mainSteps" json:"mainSteps"`
 }
