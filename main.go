@@ -16,40 +16,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/ssm"
 )
 
-func main() {
-
-	var (
-		sess = session.Must(session.NewSessionWithOptions(session.Options{
-			SharedConfigState: session.SharedConfigEnable,
-		}))
-		ssmSvc   = ssm.New(sess)
-		file     = os.Args[1]
-		name     = strings.ReplaceAll(path.Base(file), ".yaml", "")
-		document Document
-	)
-
-	dat, err := ioutil.ReadFile(file)
-	check(err)
-
-	err = yaml.Unmarshal(dat, &document)
-	check(err)
-
-	for i, step := range document.MainSteps {
-		if step.Inputs.RunCommandScript != "" {
-			dat, err := ioutil.ReadFile(path.Join(path.Dir(file), step.Inputs.RunCommandScript))
-			check(err)
-			document.MainSteps[i].Inputs.RunCommand = strings.Split(string(dat), "\n")
-			document.MainSteps[i].Inputs.RunCommandScript = ""
-		}
-	}
-
-	err = document.create(ssmSvc, name)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-}
-
 // Document ..
 type Document struct {
 	SchemaVersion string `yaml:"schemaVersion" json:"schemaVersion"`
@@ -73,11 +39,66 @@ type Document struct {
 	} `yaml:"mainSteps" json:"mainSteps"`
 }
 
+func main() {
+
+	var (
+		sess = session.Must(session.NewSessionWithOptions(session.Options{
+			SharedConfigState: session.SharedConfigEnable,
+		}))
+		ssmSvc     = ssm.New(sess)
+		file, name string
+		document   Document
+	)
+
+	if len(os.Args) > 1 {
+		file = os.Args[1]
+		name = strings.ReplaceAll(path.Base(file), ".yaml", "")
+	}
+
+	dat, err := ioutil.ReadFile(file)
+	if err != nil {
+		fmt.Printf("Error reading '%s': %s\n", file, err)
+		os.Exit(1)
+	}
+
+	err = yaml.Unmarshal(dat, &document)
+	if err != nil {
+		fmt.Printf("Error parsing YAML document '%s': %s\n", file, err)
+		os.Exit(1)
+	}
+
+	for i, step := range document.MainSteps {
+		if step.Inputs.RunCommandScript != "" {
+			dat, err := ioutil.ReadFile(path.Join(path.Dir(file), step.Inputs.RunCommandScript))
+			if err != nil {
+				fmt.Printf("Error reading script '%s': %s\n", step.Inputs.RunCommandScript, err)
+				os.Exit(1)
+			}
+			document.MainSteps[i].Inputs.RunCommand = strings.Split(string(dat), "\n")
+			document.MainSteps[i].Inputs.RunCommandScript = ""
+		}
+	}
+
+	err = document.create(ssmSvc, name)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}
+
 func (d *Document) create(s *ssm.SSM, name string) error {
+
+	for i, step := range d.MainSteps {
+		if len(step.Precondition.StringEquals) == 0 {
+			fmt.Println(d.MainSteps[i].Precondition)
+		}
+	}
+
 	dat, err := json.Marshal(d)
 	if err != nil {
 		return err
 	}
+
 	_, err = s.CreateDocument(&ssm.CreateDocumentInput{
 		Name:           &name,
 		Content:        aws.String(string(dat)),
@@ -92,7 +113,9 @@ func (d *Document) create(s *ssm.SSM, name string) error {
 			if awsErr.Code() == ssm.ErrCodeDocumentAlreadyExists {
 				return d.update(s, name)
 			}
+			return err
 		}
+		return err
 	}
 
 	fmt.Printf("created %s\n", name)
@@ -104,6 +127,7 @@ func (d *Document) update(s *ssm.SSM, name string) error {
 	if err != nil {
 		return err
 	}
+
 	o, err := s.UpdateDocument(&ssm.UpdateDocumentInput{
 		Name:            &name,
 		Content:         aws.String(string(dat)),
@@ -111,26 +135,25 @@ func (d *Document) update(s *ssm.SSM, name string) error {
 		TargetType:      aws.String("/"),
 		DocumentVersion: aws.String("$LATEST"),
 	})
+
 	if err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
 			// process SDK error
 			if awsErr.Code() == ssm.ErrCodeDuplicateDocumentContent {
+				fmt.Println("No changes to document.")
 				return nil
 			}
+			return err
 		}
+		return err
 	}
 
 	fmt.Printf("updated %s\n", name)
-	_, err = s.UpdateDocumentDefaultVersion(&ssm.UpdateDocumentDefaultVersionInput{
+	updateDocumentDefaultVersionOutput, err := s.UpdateDocumentDefaultVersion(&ssm.UpdateDocumentDefaultVersionInput{
 		Name:            &name,
 		DocumentVersion: o.DocumentDescription.DocumentVersion,
 	})
+
+	fmt.Println(updateDocumentDefaultVersionOutput.Description)
 	return err
-
-}
-
-func check(err error) {
-	if err != nil {
-		fmt.Println(err)
-	}
 }

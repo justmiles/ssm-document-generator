@@ -46,6 +46,4 @@ mainSteps:
     name: ScanMacOS
     inputs:
       timeoutSeconds: 7200
-
-
 ```
