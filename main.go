@@ -20,7 +20,10 @@ import (
 type Document struct {
 	SchemaVersion string `yaml:"schemaVersion" json:"schemaVersion"`
 	Description   string `yaml:"description" json:"description"`
-	Parameters    struct {
+	Parameters    map[string]struct {
+		Type        string `yaml:"type,omitempty" json:"type"`
+		Description string `yaml:"description,omitempty" json:"description"`
+		Default     string `yaml:"default,omitempty" json:"default"`
 	} `yaml:"parameters,omitempty" json:"parameters,omitempty"`
 	MainSteps []struct {
 		Precondition struct {
